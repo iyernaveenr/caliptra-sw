@@ -56,6 +56,7 @@ use caliptra_error::CaliptraError;
 use caliptra_image_types::{
     ECC384_SCALAR_BYTE_SIZE, SHA384_DIGEST_BYTE_SIZE, SHA512_DIGEST_BYTE_SIZE,
 };
+use constant_time_eq::constant_time_eq;
 use zerocopy::{transmute, FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub const GCM_MAX_KEY_USES: u64 = (1 << 32) - 1;
@@ -2448,8 +2449,8 @@ impl Commands {
         )?;
 
         let computed_digest_bytes: [u8; 48] = computed_digest.into();
-        if computed_digest_bytes != cmd.encrypted_data_sha384 {
-            Err(CaliptraError::RUNTIME_MAILBOX_INVALID_PARAMS)?;
+        if !constant_time_eq(&computed_digest_bytes, &cmd.encrypted_data_sha384) {
+            Err(CaliptraError::RUNTIME_CMB_DMA_SHA384_MISMATCH)?;
         }
 
         // Extract key and IV from CMK
