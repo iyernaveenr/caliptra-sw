@@ -22,6 +22,7 @@ use crate::Pic;
 use bit_vec::BitVec;
 use caliptra_emu_bus::{Bus, BusError, Clock, Event, TimerAction};
 use caliptra_emu_types::{RvAddr, RvData, RvException, RvSize};
+use std::cell::Cell;
 use std::fs::File;
 use std::io::Write;
 use std::rc::Rc;
@@ -374,10 +375,16 @@ pub enum StepAction {
 
 impl<TBus: Bus> Cpu<TBus> {
     /// Create a new RISCV CPU
-    pub fn new(bus: TBus, clock: Rc<Clock>, pic: Rc<Pic>, args: CpuArgs) -> Self {
+    pub fn new(
+        bus: TBus,
+        clock: Rc<Clock>,
+        pic: Rc<Pic>,
+        args: CpuArgs,
+        mrac: Rc<Cell<u32>>,
+    ) -> Self {
         Self {
             xregs: XRegFile::new(),
-            csrs: CsrFile::new(clock.clone(), pic.clone()),
+            csrs: CsrFile::new(clock.clone(), pic.clone(), mrac),
             pc: args.org.reset_vector,
             next_pc: args.org.reset_vector,
             bus,
@@ -1128,7 +1135,7 @@ mod tests {
         let clock = Rc::new(Clock::new());
         let pic = Rc::new(Pic::new());
         let args = CpuArgs::default();
-        let cpu = Cpu::new(DynamicBus::new(), clock, pic, args);
+        let cpu = Cpu::new(DynamicBus::new(), clock, pic, args, Rc::new(Cell::new(0)));
         assert_eq!(cpu.read_pc(), 0);
     }
 
@@ -1137,7 +1144,7 @@ mod tests {
         let clock = Rc::new(Clock::new());
         let pic = Rc::new(Pic::new());
         let args = CpuArgs::default();
-        let mut cpu = Cpu::new(DynamicBus::new(), clock, pic, args);
+        let mut cpu = Cpu::new(DynamicBus::new(), clock, pic, args, Rc::new(Cell::new(0)));
         cpu.write_pc(0xFF);
         assert_eq!(cpu.read_pc(), 0xFF);
     }
@@ -1147,7 +1154,7 @@ mod tests {
         let clock = Rc::new(Clock::new());
         let pic = Rc::new(Pic::new());
         let args = CpuArgs::default();
-        let mut cpu = Cpu::new(DynamicBus::new(), clock, pic, args);
+        let mut cpu = Cpu::new(DynamicBus::new(), clock, pic, args, Rc::new(Cell::new(0)));
         for reg in 1..32u32 {
             assert_eq!(cpu.write_xreg(reg.into(), 0xFF).ok(), Some(()));
             assert_eq!(cpu.read_xreg(reg.into()).ok(), Some(0xFF));
@@ -1169,7 +1176,7 @@ mod tests {
 
         let args = CpuArgs::default();
 
-        Cpu::new(bus, clock, pic, args)
+        Cpu::new(bus, clock, pic, args, Rc::new(Cell::new(0)))
     }
 
     #[test]
@@ -2022,7 +2029,7 @@ mod tests {
 
         let pic = Rc::new(Pic::new());
         let args = CpuArgs::default();
-        let mut cpu = Cpu::new(bus, clock.clone(), pic, args);
+        let mut cpu = Cpu::new(bus, clock.clone(), pic, args, Rc::new(Cell::new(0)));
         for i in 0..30 {
             assert_eq!(cpu.clock.now(), i);
             assert_eq!(cpu.step(None), StepAction::Continue);
@@ -2095,7 +2102,7 @@ mod tests {
 
         let pic = Rc::new(Pic::new());
         let args = CpuArgs::default();
-        let mut cpu = Cpu::new(bus, clock.clone(), pic, args);
+        let mut cpu = Cpu::new(bus, clock.clone(), pic, args, Rc::new(Cell::new(0)));
         cpu.csrs.internal_timers.write_mitcnt(0, 100);
         cpu.global_int_en = true;
         cpu.ext_int_en = true;
