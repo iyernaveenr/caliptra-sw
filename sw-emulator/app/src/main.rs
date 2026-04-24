@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 use caliptra_api_types::{DeviceLifecycle, SecurityState};
-use caliptra_emu_bus::Clock;
+use caliptra_emu_bus::{Clock, Device, Event, EventData, MracBus};
 use caliptra_emu_cpu::{Cpu, CpuArgs, Pic, RvInstr, StepAction};
 use caliptra_emu_periph::soc_reg::DebugManufService;
 use caliptra_emu_periph::{
@@ -22,6 +22,7 @@ use caliptra_emu_periph::{
 };
 use caliptra_hw_model::BusMmio;
 use clap::{arg, value_parser, ArgAction};
+use std::cell::Cell;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
@@ -48,7 +49,13 @@ const FW_WRITE_TICKS: u64 = 1000;
 const EXPECTED_CALIPTRA_BOOT_TIME_IN_CYCLES: u64 = 20_000_000; // 20 million cycles
 
 // CPU Main Loop (free_run no GDB)
-fn free_run(mut cpu: Cpu<CaliptraRootBus>, trace_path: Option<PathBuf>) {
+fn free_run(
+    mut cpu: Cpu<MracBus<CaliptraRootBus>>,
+    trace_path: Option<PathBuf>,
+    events_to_caliptra: mpsc::Sender<Event>,
+    events_from_caliptra: mpsc::Receiver<Event>,
+) {
+    let mut collected_events_from_caliptra = Vec::new();
     if let Some(path) = trace_path {
         let mut f = File::create(path).unwrap();
         let trace_fn: &mut dyn FnMut(u32, RvInstr) = &mut |pc, instr| {
@@ -68,6 +75,55 @@ fn free_run(mut cpu: Cpu<CaliptraRootBus>, trace_path: Option<PathBuf>) {
     } else {
         while let StepAction::Continue = cpu.step(None) {}
     };
+}
+
+fn step_recovery_flow(cpu: &mut Cpu<MracBus<CaliptraRootBus>>) {
+    // do the bare minimum for the recovery flow: activating the recovery image
+    const DEVICE_STATUS_PENDING: u32 = 0x4;
+    const ACTIVATE_RECOVERY_IMAGE_CMD: u32 = 0xF;
+    if DeviceStatus0ReadVal::from(cpu.bus.inner().dma.axi.recovery.device_status_0.reg.get())
+        .dev_status()
+        == DEVICE_STATUS_PENDING
+    {
+        cpu.bus
+            .inner_mut()
+            .dma
+            .axi
+            .recovery
+            .recovery_ctrl
+            .reg
+            .modify(RecoveryControl::ACTIVATE_RECOVERY_IMAGE.val(ACTIVATE_RECOVERY_IMAGE_CMD));
+    }
+}
+
+fn handle_events(
+    cpu: &mut Cpu<MracBus<CaliptraRootBus>>,
+    events_from_caliptra: &mpsc::Receiver<Event>,
+    events_to_caliptra: &mpsc::Sender<Event>,
+    collected_events_from_caliptra: &mut Vec<Event>,
+) {
+    for event in events_from_caliptra.try_iter() {
+        collected_events_from_caliptra.push(event.clone());
+        // brute force respond to AXI DMA MCU SRAM read
+        if let (Device::MCU, EventData::MemoryRead { start_addr, len }) = (event.dest, event.event)
+        {
+            let addr = start_addr as usize;
+            let mcu_sram_data = cpu.bus.inner_mut().dma.axi.mcu_sram.data_mut();
+            let Some(dest) = mcu_sram_data.get_mut(addr..addr + len as usize) else {
+                continue;
+            };
+            events_to_caliptra
+                .send(Event {
+                    src: Device::MCU,
+                    dest: Device::CaliptraCore,
+                    event: EventData::MemoryReadResponse {
+                        start_addr,
+                        data: dest.to_vec(),
+                    },
+                })
+                .unwrap();
+        }
+    }
 }
 
 fn words_from_bytes_le(arr: &[u8; 48]) -> [u32; 12] {
@@ -167,6 +223,11 @@ fn main() -> io::Result<()> {
         )
         .arg(
             arg!(--"subsystem-mode" ... "Subsystem mode: get image update via recovery register interface")
+                .required(false)
+                .action(ArgAction::SetTrue)
+        )
+        .arg(
+            arg!(--"mrac" ... "Enable MRAC (Memory Region Access Control) enforcement")
                 .required(false)
                 .action(ArgAction::SetTrue)
         )
@@ -430,7 +491,16 @@ fn main() -> io::Result<()> {
 
     let cpu_args = CpuArgs::default();
 
-    let cpu = Cpu::new(root_bus, clock.clone(), pic, cpu_args);
+    let mrac_enabled = args.get_flag("mrac");
+    let mrac = Rc::new(Cell::new(0u32));
+    let mut cpu = Cpu::new(
+        MracBus::new(root_bus, mrac.clone(), mrac_enabled),
+        clock.clone(),
+        pic,
+        cpu_args,
+        mrac,
+    );
+    let (events_to_caliptra, events_from_caliptra) = cpu.register_events();
 
     // Check if Optional GDB Port is passed
     match args.get_one::<String>("gdb-port") {
