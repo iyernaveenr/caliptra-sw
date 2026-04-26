@@ -84,6 +84,7 @@ impl<TBus: Bus> Bus for MracBus<TBus> {
         if self.is_sideeffect(addr) {
             // Side-effect: only word-aligned, word-sized access
             if size != RvSize::Word || (addr & 0x3) != 0 {
+                println!("MRAC REJECT READ: addr=0x{:08x} size={:?} region={} bits=0b{:02b}", addr, size, (addr >> 28) & 0xF, self.region_bits(addr));
                 return Err(BusError::LoadAddrMisaligned);
             }
             return self.inner.read(size, addr);
@@ -119,6 +120,7 @@ impl<TBus: Bus> Bus for MracBus<TBus> {
         if self.is_sideeffect(addr) {
             // Side-effect: only word-aligned, word-sized access
             if size != RvSize::Word || (addr & 0x3) != 0 {
+                println!("MRAC REJECT WRITE: addr=0x{:08x} size={:?} region={} bits=0b{:02b}", addr, size, (addr >> 28) & 0xF, self.region_bits(addr));
                 return Err(BusError::StoreAddrMisaligned);
             }
         }

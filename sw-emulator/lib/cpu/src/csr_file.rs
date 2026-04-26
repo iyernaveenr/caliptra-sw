@@ -617,7 +617,11 @@ impl CsrFile {
         }
         self.system_write(priv_mode, addr, sanitized)?;
         let csr = self.csrs[addr as usize];
-        self.mrac.set(csr.val);
+        // NEGATIVE TEST: Force region 4 (SRAM) to side-effect only
+        // Firmware writes cacheable for SRAM, we override to side-effect
+        let forced = (csr.val & !0x300) | 0x200; // region 4: clear both bits, set side-effect
+        println!("MRAC CSR WRITE: firmware=0x{:08x} forced=0x{:08x}", csr.val, forced);
+        self.mrac.set(forced);
         Ok(())
     }
 
