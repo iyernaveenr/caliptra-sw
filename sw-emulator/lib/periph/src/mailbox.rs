@@ -13,7 +13,7 @@ Abstract:
 --*/
 use smlang::statemachine;
 
-use caliptra_emu_bus::{AlignedRam, Bus, BusMmio, Clock, Timer};
+use caliptra_emu_bus::{AlignedRam, Bus, BusMmio, Clock, Timer, BusAccessType};
 use caliptra_emu_bus::{BusError, ReadOnlyRegister, ReadWriteRegister, WriteOnlyRegister};
 use caliptra_emu_derive::Bus;
 use caliptra_emu_types::{RvAddr, RvData, RvSize};
@@ -72,8 +72,8 @@ impl MailboxRam {
 
 impl Bus for MailboxRam {
     /// Read data of specified size from given address
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, BusError> {
-        self.ram.borrow_mut().read(size, addr)
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
+        self.ram.borrow_mut().read(size, addr, BusAccessType::DataLoad)
     }
 
     /// Write data of specified size to given address
@@ -106,10 +106,10 @@ impl MailboxExternal {
 
 impl Bus for MailboxExternal {
     /// Read data of specified size from given address
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, BusError> {
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
         let mut regs = self.regs.borrow_mut();
         regs.set_request(self.soc_user);
-        let result = regs.read(size, addr);
+        let result = regs.read(size, addr, BusAccessType::DataLoad);
         regs.set_request(MailboxRequester::Caliptra);
         result
     }
@@ -169,11 +169,11 @@ impl MailboxInternal {
 
 impl Bus for MailboxInternal {
     /// Read data of specified size from given address
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, BusError> {
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
         self.regs
             .borrow_mut()
             .set_request(MailboxRequester::Caliptra);
-        self.regs.borrow_mut().read(size, addr)
+        self.regs.borrow_mut().read(size, addr, BusAccessType::DataLoad)
     }
 
     /// Write data of specified size to given address
@@ -642,7 +642,7 @@ impl Fifo {
 
         let element = self
             .mailbox_ram
-            .read(RvSize::Word, self.read_index as u32)
+            .read(RvSize::Word, self.read_index as u32, BusAccessType::DataLoad)
             .unwrap();
 
         self.read_index += RvSize::Word as usize;

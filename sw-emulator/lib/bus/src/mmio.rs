@@ -1,3 +1,4 @@
+use crate::bus::BusAccessType;
 // Licensed under the Apache-2.0 license
 
 use std::cell::RefCell;
@@ -53,7 +54,7 @@ impl<TBus: Bus> ureg::Mmio for BusMmio<TBus> {
         let val_u32 = self
             .bus
             .borrow_mut()
-            .read(rvsize::<T>(), src as usize as u32)
+            .read(rvsize::<T>(), src as usize as u32, crate::bus::BusAccessType::DataLoad)
             .unwrap();
         match std::mem::size_of::<T>() {
             1 => std::mem::transmute_copy::<u8, T>(&(val_u32 as u8)),

@@ -246,21 +246,21 @@ impl AxiRootBus {
         match addr {
             Self::SHA512_ACC_OFFSET..=Self::SHA512_ACC_END => {
                 let addr = ((addr - Self::SHA512_ACC_OFFSET) & 0xffff_ffff) as RvAddr;
-                return Bus::read(&mut self.sha512_acc, size, addr);
+                return Bus::read(&mut self.sha512_acc, size, addr, caliptra_emu_bus::BusAccessType::DataLoad);
             }
             Self::TEST_REG_OFFSET => return Register::read(&self.reg, size),
             Self::RECOVERY_REGISTER_INTERFACE_OFFSET..=Self::RECOVERY_REGISTER_INTERFACE_END => {
                 let addr = (addr - Self::RECOVERY_REGISTER_INTERFACE_OFFSET) as RvAddr;
-                return Bus::read(&mut self.recovery, size, addr);
+                return Bus::read(&mut self.recovery, size, addr, caliptra_emu_bus::BusAccessType::DataLoad);
             }
             Self::OTC_FC_OFFSET..=Self::OTC_FC_END => {
                 let addr = (addr - Self::OTC_FC_OFFSET) as RvAddr;
-                return Bus::read(&mut self.otp_fc, size, addr);
+                return Bus::read(&mut self.otp_fc, size, addr, caliptra_emu_bus::BusAccessType::DataLoad);
             }
             Self::TEST_SRAM_OFFSET..=Self::TEST_SRAM_END => {
                 if let Some(test_sram) = self.test_sram.as_mut() {
                     let addr = (addr - Self::TEST_SRAM_OFFSET) as RvAddr;
-                    return Bus::read(test_sram, size, addr);
+                    return Bus::read(test_sram, size, addr, caliptra_emu_bus::BusAccessType::DataLoad);
                 } else {
                     return Err(LoadAccessFault);
                 }
@@ -270,10 +270,10 @@ impl AxiRootBus {
 
         if (Self::mcu_sram_offset()..=Self::mcu_sram_end()).contains(&addr) {
             let addr = (addr - Self::mcu_sram_offset()) as RvAddr;
-            return Bus::read(&mut self.mcu_sram, size, addr);
+            return Bus::read(&mut self.mcu_sram, size, addr, caliptra_emu_bus::BusAccessType::DataLoad);
         } else if (*SS_MCI_OFFSET..=Self::mcu_sram_end()).contains(&addr) {
             let addr = (addr - *SS_MCI_OFFSET) as RvAddr;
-            return Bus::read(&mut self.mci, size, addr);
+            return Bus::read(&mut self.mci, size, addr, caliptra_emu_bus::BusAccessType::DataLoad);
         }
 
         Err(LoadAccessFault)

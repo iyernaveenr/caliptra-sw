@@ -1,3 +1,4 @@
+use crate::bus::BusAccessType;
 /*++
 
 Licensed under the Apache-2.0 license.
@@ -350,7 +351,7 @@ impl<const N: usize> ReadWriteMemory<N> {
 
 impl<const N: usize> Bus for ReadWriteMemory<N> {
     /// Read data of specified size from given address
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, BusError> {
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
         match self.data.read(size, addr) {
             Ok(data) => Ok(data),
             Err(error) => Err(error.into()),
@@ -412,7 +413,7 @@ impl<const N: usize> ReadOnlyMemory<N> {
 
 impl<const N: usize> Bus for ReadOnlyMemory<N> {
     /// Read data of specified size from given address
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, BusError> {
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
         match self.data.read(size, addr) {
             Ok(data) => Ok(data),
             Err(error) => Err(error.into()),
@@ -463,7 +464,7 @@ impl<const N: usize> WriteOnlyMemory<N> {
 
 impl<const N: usize> Bus for WriteOnlyMemory<N> {
     /// Read data of specified size from given address
-    fn read(&mut self, _size: RvSize, _addr: RvAddr) -> Result<RvData, BusError> {
+    fn read(&mut self, _size: RvSize, _addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
         Err(BusError::LoadAccessFault)
     }
 
@@ -752,7 +753,7 @@ mod tests {
                 Some(())
             );
             assert_eq!(
-                mem.read(RvSize::Byte, i as RvAddr).ok(),
+                mem.read(RvSize::Byte, i as RvAddr, BusAccessType::DataLoad).ok(),
                 Some(u8::MAX as RvData)
             );
         }
@@ -763,7 +764,7 @@ mod tests {
                 Some(())
             );
             assert_eq!(
-                mem.read(RvSize::HalfWord, i as RvAddr).ok(),
+                mem.read(RvSize::HalfWord, i as RvAddr, BusAccessType::DataLoad).ok(),
                 Some(u16::MAX as RvData)
             );
         }
@@ -773,7 +774,7 @@ mod tests {
                 mem.write(RvSize::Word, i as RvAddr, u32::MAX).ok(),
                 Some(())
             );
-            assert_eq!(mem.read(RvSize::Word, i as RvAddr).ok(), Some(u32::MAX));
+            assert_eq!(mem.read(RvSize::Word, i as RvAddr, BusAccessType::DataLoad).ok(), Some(u32::MAX));
         }
     }
 
@@ -788,7 +789,7 @@ mod tests {
                 Some(BusError::StoreAccessFault)
             );
             assert_eq!(
-                mem.read(RvSize::Byte, i as RvAddr).ok(),
+                mem.read(RvSize::Byte, i as RvAddr, BusAccessType::DataLoad).ok(),
                 Some(u8::MAX as RvData)
             );
         }
@@ -799,7 +800,7 @@ mod tests {
                 Some(BusError::StoreAccessFault)
             );
             assert_eq!(
-                mem.read(RvSize::HalfWord, i as RvAddr).ok(),
+                mem.read(RvSize::HalfWord, i as RvAddr, BusAccessType::DataLoad).ok(),
                 Some(u16::MAX as RvData)
             );
         }
@@ -809,7 +810,7 @@ mod tests {
                 mem.write(RvSize::Word, i as RvAddr, u32::MAX).err(),
                 Some(BusError::StoreAccessFault)
             );
-            assert_eq!(mem.read(RvSize::Word, i as RvAddr).ok(), Some(u32::MAX));
+            assert_eq!(mem.read(RvSize::Word, i as RvAddr, BusAccessType::DataLoad).ok(), Some(u32::MAX));
         }
     }
 
@@ -825,7 +826,7 @@ mod tests {
             );
             assert_eq!(mem.data()[i], u8::MAX);
             assert_eq!(
-                mem.read(RvSize::Byte, i as RvAddr).err(),
+                mem.read(RvSize::Byte, i as RvAddr, BusAccessType::DataLoad).err(),
                 Some(BusError::LoadAccessFault)
             );
         }
@@ -837,7 +838,7 @@ mod tests {
             );
             assert_eq!(mem.data()[i..i + 2], [u8::MAX; 2]);
             assert_eq!(
-                mem.read(RvSize::Byte, i as RvAddr).err(),
+                mem.read(RvSize::Byte, i as RvAddr, BusAccessType::DataLoad).err(),
                 Some(BusError::LoadAccessFault)
             )
         }
@@ -849,7 +850,7 @@ mod tests {
             );
             assert_eq!(mem.data()[i..i + 4], [u8::MAX; 4]);
             assert_eq!(
-                mem.read(RvSize::Byte, i as RvAddr).err(),
+                mem.read(RvSize::Byte, i as RvAddr, BusAccessType::DataLoad).err(),
                 Some(BusError::LoadAccessFault)
             )
         }

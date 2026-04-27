@@ -47,8 +47,8 @@ pub struct EmulatedApbBus<'a> {
 }
 
 impl Bus for EmulatedApbBus<'_> {
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, caliptra_emu_bus::BusError> {
-        let result = self.model.soc_to_caliptra_bus.read(size, addr);
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: caliptra_emu_bus::BusAccessType) -> Result<RvData, caliptra_emu_bus::BusError> {
+        let result = self.model.soc_to_caliptra_bus.read(size, addr, caliptra_emu_bus::BusAccessType::DataLoad);
         self.model.cpu.bus.log_read("SoC", size, addr, result);
         result
     }

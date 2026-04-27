@@ -282,7 +282,7 @@ mod tests {
 
         loop {
             let status = InMemoryRegister::<u32, Status::Register>::new(
-                doe.read(RvSize::Word, OFFSET_STATUS).unwrap(),
+                doe.read(RvSize::Word, OFFSET_STATUS, caliptra_emu_bus::BusAccessType::DataLoad).unwrap(),
             );
 
             if status.is_set(Status::VALID) {
@@ -354,7 +354,7 @@ mod tests {
 
         loop {
             let status = InMemoryRegister::<u32, Status::Register>::new(
-                doe.read(RvSize::Word, OFFSET_STATUS).unwrap(),
+                doe.read(RvSize::Word, OFFSET_STATUS, caliptra_emu_bus::BusAccessType::DataLoad).unwrap(),
             );
 
             if status.is_set(Status::VALID) {
@@ -415,7 +415,7 @@ mod tests {
 
         loop {
             let status = InMemoryRegister::<u32, Status::Register>::new(
-                doe.read(RvSize::Word, OFFSET_STATUS).unwrap(),
+                doe.read(RvSize::Word, OFFSET_STATUS, caliptra_emu_bus::BusAccessType::DataLoad).unwrap(),
             );
 
             if status.is_set(Status::VALID) {

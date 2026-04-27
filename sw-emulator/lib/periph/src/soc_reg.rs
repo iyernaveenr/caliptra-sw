@@ -19,8 +19,10 @@ use crate::Mci;
 use crate::{CaliptraRootBusArgs, Iccm, MailboxInternal};
 use caliptra_emu_bus::BusError::{LoadAccessFault, StoreAccessFault};
 use caliptra_emu_bus::{
-    ActionHandle, Bus, BusError, ReadOnlyRegister, ReadWriteRegister, Register, Timer, TimerAction,
+    ActionHandle, Bus, BusAccessType, BusError, ReadOnlyRegister, ReadWriteRegister, Register,
+    Timer, TimerAction,
 };
+
 use caliptra_emu_cpu::{IntSource, Irq};
 use caliptra_emu_derive::Bus;
 use caliptra_emu_types::{RvAddr, RvData, RvSize};
@@ -433,10 +435,10 @@ impl SocRegistersInternal {
 
 impl Bus for SocRegistersInternal {
     /// Read data of specified size from given address
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, BusError> {
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
         match addr {
             CALIPTRA_REG_START_ADDR..=CALIPTRA_REG_END_ADDR => {
-                self.regs.borrow_mut().read(size, addr)
+                self.regs.borrow_mut().read(size, addr, BusAccessType::DataLoad)
             }
             _ => Err(LoadAccessFault),
         }
@@ -495,10 +497,10 @@ pub struct SocRegistersExternal {
 }
 impl Bus for SocRegistersExternal {
     /// Read data of specified size from given address
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, BusError> {
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
         match addr {
             CALIPTRA_REG_START_ADDR..=CALIPTRA_REG_END_ADDR => {
-                self.regs.borrow_mut().read(size, addr)
+                self.regs.borrow_mut().read(size, addr, BusAccessType::DataLoad)
             }
             _ => Err(LoadAccessFault),
         }
@@ -1873,7 +1875,7 @@ mod tests {
 
         loop {
             let status = InMemoryRegister::<u32, WdtStatus::Register>::new(
-                soc_reg.read(RvSize::Word, CPTRA_WDT_STATUS_START).unwrap(),
+                soc_reg.read(RvSize::Word, CPTRA_WDT_STATUS_START, BusAccessType::DataLoad).unwrap(),
             );
             if status.is_set(WdtStatus::T2_TIMEOUT) {
                 break;
@@ -1933,7 +1935,7 @@ mod tests {
 
         // Verify timer is enabled and didn't panic
         let timer1_en = soc_reg
-            .read(RvSize::Word, CPTRA_WDT_TIMER1_EN_START)
+            .read(RvSize::Word, CPTRA_WDT_TIMER1_EN_START, BusAccessType::DataLoad)
             .unwrap();
         assert_eq!(timer1_en, 1);
     }
@@ -1976,7 +1978,7 @@ mod tests {
 
         // Verify timer is enabled
         let timer2_en = soc_reg
-            .read(RvSize::Word, CPTRA_WDT_TIMER2_EN_START)
+            .read(RvSize::Word, CPTRA_WDT_TIMER2_EN_START, BusAccessType::DataLoad)
             .unwrap();
         assert_eq!(timer2_en, 1);
     }
@@ -2025,7 +2027,7 @@ mod tests {
 
         // Verify timer is still enabled
         let timer1_en = soc_reg
-            .read(RvSize::Word, CPTRA_WDT_TIMER1_EN_START)
+            .read(RvSize::Word, CPTRA_WDT_TIMER1_EN_START, BusAccessType::DataLoad)
             .unwrap();
         assert_eq!(timer1_en, 1);
     }
@@ -2073,7 +2075,7 @@ mod tests {
 
         // Verify timer is still enabled
         let timer2_en = soc_reg
-            .read(RvSize::Word, CPTRA_WDT_TIMER2_EN_START)
+            .read(RvSize::Word, CPTRA_WDT_TIMER2_EN_START, BusAccessType::DataLoad)
             .unwrap();
         assert_eq!(timer2_en, 1);
     }
@@ -2127,7 +2129,7 @@ mod tests {
         // which exercises the error_intr code path that reschedules timer 2
         loop {
             let status = InMemoryRegister::<u32, WdtStatus::Register>::new(
-                soc_reg.read(RvSize::Word, CPTRA_WDT_STATUS_START).unwrap(),
+                soc_reg.read(RvSize::Word, CPTRA_WDT_STATUS_START, BusAccessType::DataLoad).unwrap(),
             );
             if status.is_set(WdtStatus::T1_TIMEOUT) {
                 break;
@@ -2137,7 +2139,7 @@ mod tests {
 
         // If we got here without panicking, the fix works
         let status = InMemoryRegister::<u32, WdtStatus::Register>::new(
-            soc_reg.read(RvSize::Word, CPTRA_WDT_STATUS_START).unwrap(),
+            soc_reg.read(RvSize::Word, CPTRA_WDT_STATUS_START, BusAccessType::DataLoad).unwrap(),
         );
         assert!(status.is_set(WdtStatus::T1_TIMEOUT));
     }

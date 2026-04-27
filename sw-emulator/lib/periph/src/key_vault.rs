@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 use bitfield::bitfield;
-use caliptra_emu_bus::{Bus, BusError, ReadWriteMemory, ReadWriteRegisterArray};
+use caliptra_emu_bus::{Bus, BusAccessType, BusError, ReadWriteMemory, ReadWriteRegisterArray};
 use caliptra_emu_derive::Bus;
 use caliptra_emu_types::{RvAddr, RvData, RvSize};
 use std::cell::RefCell;
@@ -217,8 +217,8 @@ impl Default for KeyVault {
 
 impl Bus for KeyVault {
     /// Read data of specified size from given address
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, BusError> {
-        self.regs.borrow_mut().read(size, addr)
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
+        self.regs.borrow_mut().read(size, addr, BusAccessType::DataLoad)
     }
 
     /// Write data of specified size to given address
@@ -709,7 +709,7 @@ mod tests {
         for idx in 0u32..KeyVault::KEY_COUNT {
             assert_eq!(
                 vault
-                    .read(RvSize::Word, KeyVault::KEY_CONTROL_REG_OFFSET + (idx << 2))
+                    .read(RvSize::Word, KeyVault::KEY_CONTROL_REG_OFFSET + (idx << 2), BusAccessType::DataLoad)
                     .ok(),
                 Some(KEY_CONTROL_REG_RESET_VAL)
             );
@@ -723,7 +723,7 @@ mod tests {
             let addr = OFFSET_KEYS + (idx * KeyVault::KEY_SIZE as u32);
             assert_eq!(vault.write(RvSize::Word, addr, u32::MAX).ok(), None);
 
-            assert_eq!(vault.read(RvSize::Word, addr).ok(), None);
+            assert_eq!(vault.read(RvSize::Word, addr, BusAccessType::DataLoad).ok(), None);
         }
     }
 
@@ -821,7 +821,7 @@ mod tests {
             for (word_idx, pcr_word) in pcr.iter_mut().enumerate().take(PCR_SIZE_WORDS) {
                 let result = vault.read(
                     RvSize::Word,
-                    pcr_start_word_addr + (word_idx as u32 * RvSize::Word as u32),
+                    pcr_start_word_addr + (word_idx as u32 * RvSize::Word as u32), BusAccessType::DataLoad,
                 );
                 assert!(result.is_ok());
                 *pcr_word = result.unwrap();
@@ -1036,7 +1036,7 @@ mod tests {
             let ctrl_reg_addr = STICKY_DATAVAULT_CTRL_REG_START_OFFSET
                 + (ctrl_reg_idx * STICKY_DATAVAULT_CTRL_REG_WIDTH);
             assert_eq!(
-                vault.read(RvSize::Word, ctrl_reg_addr).ok(),
+                vault.read(RvSize::Word, ctrl_reg_addr, BusAccessType::DataLoad).ok(),
                 Some(STICKY_DATAVAULT_CTRL_REG_RESET_VAL)
             );
         }
@@ -1057,7 +1057,7 @@ mod tests {
                     Some(())
                 );
                 assert_eq!(
-                    vault.read(RvSize::Word, dv_word_addr).ok(),
+                    vault.read(RvSize::Word, dv_word_addr, BusAccessType::DataLoad).ok(),
                     Some(0xCAFEB0BA)
                 );
             }
@@ -1066,7 +1066,7 @@ mod tests {
             let ctrl_reg_addr = STICKY_DATAVAULT_CTRL_REG_START_OFFSET
                 + (dv_entry_idx * STICKY_DATAVAULT_CTRL_REG_WIDTH);
             assert_eq!(vault.write(RvSize::Word, ctrl_reg_addr, 0x1).ok(), Some(()));
-            assert_eq!(vault.read(RvSize::Word, ctrl_reg_addr).ok(), Some(0x1));
+            assert_eq!(vault.read(RvSize::Word, ctrl_reg_addr, BusAccessType::DataLoad).ok(), Some(0x1));
 
             for word_offset in 0u32..STICKY_DATAVAULT_ENTRY_WIDTH / 4 {
                 let dv_word_addr = STICKY_DATAVAULT_ENTRY_WORD_START_OFFSET
@@ -1088,7 +1088,7 @@ mod tests {
             let ctrl_reg_addr =
                 DATAVAULT_CTRL_REG_START_OFFSET + (ctrl_reg_idx * DATAVAULT_CTRL_REG_WIDTH);
             assert_eq!(
-                vault.read(RvSize::Word, ctrl_reg_addr).ok(),
+                vault.read(RvSize::Word, ctrl_reg_addr, BusAccessType::DataLoad).ok(),
                 Some(DATAVAULT_CTRL_REG_RESET_VAL)
             );
         }
@@ -1109,7 +1109,7 @@ mod tests {
                     Some(())
                 );
                 assert_eq!(
-                    vault.read(RvSize::Word, dv_word_addr).ok(),
+                    vault.read(RvSize::Word, dv_word_addr, BusAccessType::DataLoad).ok(),
                     Some(0xDEADBEEF)
                 );
             }
@@ -1118,7 +1118,7 @@ mod tests {
             let ctrl_reg_addr =
                 DATAVAULT_CTRL_REG_START_OFFSET + (dv_entry_idx * DATAVAULT_CTRL_REG_WIDTH);
             assert_eq!(vault.write(RvSize::Word, ctrl_reg_addr, 0x1).ok(), Some(()));
-            assert_eq!(vault.read(RvSize::Word, ctrl_reg_addr).ok(), Some(0x1));
+            assert_eq!(vault.read(RvSize::Word, ctrl_reg_addr, BusAccessType::DataLoad).ok(), Some(0x1));
 
             for word_offset in 0u32..DATAVAULT_ENTRY_WIDTH / 4 {
                 let dv_word_addr = DATAVAULT_ENTRY_WORD_START_OFFSET
@@ -1140,7 +1140,7 @@ mod tests {
             let addr = LOCKABLE_SCRATCH_CTRL_REG_START_OFFSET
                 + (ctrl_reg_idx * LOCKABLE_SCRATCH_CTRL_REG_WIDTH);
             assert_eq!(
-                vault.read(RvSize::Word, addr).ok(),
+                vault.read(RvSize::Word, addr, BusAccessType::DataLoad).ok(),
                 Some(LOCKABLE_SCRATCH_CTRL_REG_RESET_VAL)
             );
         }
@@ -1158,13 +1158,13 @@ mod tests {
                 vault.write(RvSize::Word, reg_addr, 0xBADF00D).ok(),
                 Some(())
             );
-            assert_eq!(vault.read(RvSize::Word, reg_addr).ok(), Some(0xBADF00D));
+            assert_eq!(vault.read(RvSize::Word, reg_addr, BusAccessType::DataLoad).ok(), Some(0xBADF00D));
 
             // Test Lock.
             let ctrl_reg_addr = LOCKABLE_SCRATCH_CTRL_REG_START_OFFSET
                 + (reg_idx * LOCKABLE_SCRATCH_CTRL_REG_WIDTH);
             assert_eq!(vault.write(RvSize::Word, ctrl_reg_addr, 0x1).ok(), Some(()));
-            assert_eq!(vault.read(RvSize::Word, ctrl_reg_addr).ok(), Some(0x1));
+            assert_eq!(vault.read(RvSize::Word, ctrl_reg_addr, BusAccessType::DataLoad).ok(), Some(0x1));
 
             assert_eq!(
                 vault.write(RvSize::Word, reg_addr, u32::MAX).err(),
@@ -1180,7 +1180,7 @@ mod tests {
             let addr = STICKY_LOCKABLE_SCRATCH_CTRL_REG_START_OFFSET
                 + (ctrl_reg_idx * STICKY_LOCKABLE_SCRATCH_CTRL_REG_WIDTH);
             assert_eq!(
-                vault.read(RvSize::Word, addr).ok(),
+                vault.read(RvSize::Word, addr, BusAccessType::DataLoad).ok(),
                 Some(STICKY_LOCKABLE_SCRATCH_CTRL_REG_RESET_VAL)
             );
         }
@@ -1195,13 +1195,13 @@ mod tests {
                 + (reg_idx * STICKY_LOCKABLE_SCRATCH_REG_WIDTH);
 
             assert_eq!(vault.write(RvSize::Word, reg_addr, 0xDADB0D).ok(), Some(()));
-            assert_eq!(vault.read(RvSize::Word, reg_addr).ok(), Some(0xDADB0D));
+            assert_eq!(vault.read(RvSize::Word, reg_addr, BusAccessType::DataLoad).ok(), Some(0xDADB0D));
 
             // Test Lock.
             let ctrl_reg_addr = STICKY_LOCKABLE_SCRATCH_CTRL_REG_START_OFFSET
                 + (reg_idx * STICKY_LOCKABLE_SCRATCH_CTRL_REG_WIDTH);
             assert_eq!(vault.write(RvSize::Word, ctrl_reg_addr, 0x1).ok(), Some(()));
-            assert_eq!(vault.read(RvSize::Word, ctrl_reg_addr).ok(), Some(0x1));
+            assert_eq!(vault.read(RvSize::Word, ctrl_reg_addr, BusAccessType::DataLoad).ok(), Some(0x1));
 
             assert_eq!(
                 vault.write(RvSize::Word, reg_addr, u32::MAX).err(),
@@ -1221,7 +1221,7 @@ mod tests {
                 vault.write(RvSize::Word, reg_addr, 0xFEEDF00D).ok(),
                 Some(())
             );
-            assert_eq!(vault.read(RvSize::Word, reg_addr).ok(), Some(0xFEEDF00D));
+            assert_eq!(vault.read(RvSize::Word, reg_addr, BusAccessType::DataLoad).ok(), Some(0xFEEDF00D));
         }
     }
 }

@@ -1339,12 +1339,12 @@ mod tests {
             .write(|w| w.lock(true));
 
         assert_eq!(
-            model.apb_bus().read(RvSize::Word, MBOX_ADDR_LOCK).unwrap(),
+            model.apb_bus().read(RvSize::Word, MBOX_ADDR_LOCK, caliptra_emu_bus::BusAccessType::DataLoad).unwrap(),
             0
         );
 
         assert_eq!(
-            model.apb_bus().read(RvSize::Word, MBOX_ADDR_LOCK).unwrap(),
+            model.apb_bus().read(RvSize::Word, MBOX_ADDR_LOCK, caliptra_emu_bus::BusAccessType::DataLoad).unwrap(),
             1
         );
 
@@ -1353,7 +1353,7 @@ mod tests {
             .write(RvSize::Word, MBOX_ADDR_CMD, 4242)
             .unwrap();
         assert_eq!(
-            model.apb_bus().read(RvSize::Word, MBOX_ADDR_CMD).unwrap(),
+            model.apb_bus().read(RvSize::Word, MBOX_ADDR_CMD, caliptra_emu_bus::BusAccessType::DataLoad).unwrap(),
             4242
         );
     }

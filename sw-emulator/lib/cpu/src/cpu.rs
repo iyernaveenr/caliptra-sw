@@ -20,8 +20,9 @@ use crate::types::{
 use crate::xreg_file::{XReg, XRegFile};
 use crate::Pic;
 use bit_vec::BitVec;
-use caliptra_emu_bus::{Bus, BusError, Clock, Event, TimerAction};
+use caliptra_emu_bus::{Bus, BusAccessType, BusError, Clock, Event, TimerAction};
 use caliptra_emu_types::{RvAddr, RvData, RvException, RvSize};
+use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::mpsc;
 
@@ -325,10 +326,10 @@ pub enum StepAction {
 
 impl<TBus: Bus> Cpu<TBus> {
     /// Create a new RISCV CPU
-    pub fn new(bus: TBus, clock: Rc<Clock>, pic: Rc<Pic>, args: CpuArgs) -> Self {
+    pub fn new(bus: TBus, clock: Rc<Clock>, pic: Rc<Pic>, args: CpuArgs, mrac: Rc<Cell<u32>>) -> Self {
         Self {
             xregs: XRegFile::new(),
-            csrs: CsrFile::new(clock.clone(), pic.clone()),
+            csrs: CsrFile::new(clock.clone(), pic.clone(), mrac),
             pc: args.org.reset_vector,
             next_pc: args.org.reset_vector,
             bus,
@@ -648,7 +649,7 @@ impl<TBus: Bus> Cpu<TBus> {
 
         self.check_mem_priv(addr, size, RvMemAccessType::Read)?;
 
-        match self.bus.read(size, addr) {
+        match self.bus.read(size, addr, caliptra_emu_bus::BusAccessType::DataLoad) {
             Ok(val) => Ok(val),
             Err(exception) => match exception {
                 BusError::InstrAccessFault => Err(RvException::instr_access_fault(addr)),
@@ -719,7 +720,7 @@ impl<TBus: Bus> Cpu<TBus> {
 
         match size {
             RvSize::Byte => Err(RvException::instr_access_fault(addr)),
-            _ => match self.bus.read(size, addr) {
+            _ => match self.bus.read(size, addr, caliptra_emu_bus::BusAccessType::InstrFetch) {
                 Ok(val) => Ok(val),
                 Err(exception) => match exception {
                     BusError::InstrAccessFault => Err(RvException::instr_access_fault(addr)),

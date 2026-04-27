@@ -3,7 +3,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use caliptra_emu_bus::{
+use caliptra_emu_bus::{BusAccessType, 
     Bus, BusError, Clock, ReadWriteRegister, ReadWriteRegisterArray, Register, Timer, TimerAction,
 };
 use caliptra_emu_derive::Bus;
@@ -133,7 +133,7 @@ impl PicMmioRegisters {
     }
 }
 impl Bus for PicMmioRegisters {
-    fn read(&mut self, size: RvSize, addr: RvAddr) -> Result<RvData, BusError> {
+    fn read(&mut self, size: RvSize, addr: RvAddr, _access_type: BusAccessType) -> Result<RvData, BusError> {
         match addr {
             // The first element of each register array is invalid. (S=1..31)
             Self::MEIPL_OFFSET
@@ -141,7 +141,7 @@ impl Bus for PicMmioRegisters {
             | Self::MEIGWCTRL_OFFSET
             | Self::MEIGWCLR_OFFSET => Err(BusError::LoadAccessFault),
             Self::MEIGWCLR_MIN..=Self::MEIGWCLR_MAX => Ok(0),
-            _ => self.pic.regs.borrow_mut().read(size, addr),
+            _ => self.pic.regs.borrow_mut().read(size, addr, BusAccessType::DataLoad),
         }
     }
 

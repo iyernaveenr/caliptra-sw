@@ -527,7 +527,7 @@ enum MultiBitBool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use caliptra_emu_bus::Bus;
+    use caliptra_emu_bus::{Bus, BusAccessType};
 
     const OFFSET_CONF: caliptra_emu_types::RvAddr = 0x1024;
     const OFFSET_MODULE_ENABLE: caliptra_emu_types::RvAddr = 0x1020;
@@ -541,7 +541,7 @@ mod tests {
         let mut csrng = Csrng::new(make_itrng_nibbles());
 
         // Verify initial state: module_enable should be 0x9 (MultiBitBool::False)
-        let initial = csrng.read(RvSize::Word, OFFSET_MODULE_ENABLE).unwrap();
+        let initial = csrng.read(RvSize::Word, OFFSET_MODULE_ENABLE, BusAccessType::DataLoad).unwrap();
         assert_eq!(initial, MultiBitBool::False as u32);
 
         // Configure FIPS mode (fips_enable in bits [3:0] = 6 for TRUE)
@@ -561,14 +561,14 @@ mod tests {
             .unwrap();
 
         // Verify module is enabled
-        let enabled = csrng.read(RvSize::Word, OFFSET_MODULE_ENABLE).unwrap();
+        let enabled = csrng.read(RvSize::Word, OFFSET_MODULE_ENABLE, BusAccessType::DataLoad).unwrap();
         assert_eq!(enabled, MultiBitBool::True as u32);
 
         // Perform warm reset
         csrng.warm_reset();
 
         // After warm reset, module_enable should be back to 0x9 (MultiBitBool::False)
-        let after_reset = csrng.read(RvSize::Word, OFFSET_MODULE_ENABLE).unwrap();
+        let after_reset = csrng.read(RvSize::Word, OFFSET_MODULE_ENABLE, BusAccessType::DataLoad).unwrap();
         assert_eq!(
             after_reset,
             MultiBitBool::False as u32,
